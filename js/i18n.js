@@ -50,7 +50,7 @@ const I18N = {
       animals: 'Les animaux', sizes: 'Grand et petit', memory: 'La mémoire',
       puzzle: 'Le puzzle', patterns: 'Les suites',
       letters: 'Les lettres', drawing: 'Le dessin', cooking: 'La cuisine',
-      vehicles: 'Les véhicules', dressup: 'La garde-robe',
+      vehicles: 'Les véhicules', dressup: 'La garde-robe', jigsaw: 'Le puzzle photo',
     },
     prompts: {
       tap: 'Touche {x}',
@@ -83,6 +83,9 @@ const I18N = {
       cookIt: 'Touche la poêle pour faire cuire !',
       ready: "C'est prêt… Bon appétit !",
       mirror: 'Habille ton personnage comme tu veux !',
+      wash: 'Frotte avec ton doigt pour nettoyer !',
+      allClean: 'Tout propre !',
+      jigsaw: "Remets les morceaux pour reconstruire l'image !",
       vehicleQ: {
         fire: 'Qui éteint le feu ?',
         police: 'Qui protège les gens ?',
@@ -220,7 +223,7 @@ const I18N = {
       animals: 'Animals', sizes: 'Big and small', memory: 'Memory',
       puzzle: 'Puzzle', patterns: 'Patterns',
       letters: 'Letters', drawing: 'Drawing', cooking: 'Cooking',
-      vehicles: 'Vehicles', dressup: 'Dress up',
+      vehicles: 'Vehicles', dressup: 'Dress up', jigsaw: 'Picture puzzle',
     },
     prompts: {
       tap: 'Tap {x}',
@@ -253,6 +256,9 @@ const I18N = {
       cookIt: 'Tap the pan to cook it!',
       ready: "It's ready… Enjoy your meal!",
       mirror: 'Dress your character however you like!',
+      wash: 'Rub with your finger to clean it!',
+      allClean: 'All clean!',
+      jigsaw: 'Put the pieces together to rebuild the picture!',
       vehicleQ: {
         fire: 'Who puts out fires?',
         police: 'Who keeps people safe?',
@@ -390,7 +396,7 @@ const I18N = {
       animals: 'الحيوانات', sizes: 'كبير وصغير', memory: 'الذاكرة',
       puzzle: 'التركيب', patterns: 'الأنماط',
       letters: 'الحروف', drawing: 'الرسم', cooking: 'المطبخ',
-      vehicles: 'المركبات', dressup: 'خزانة الملابس',
+      vehicles: 'المركبات', dressup: 'خزانة الملابس', jigsaw: 'تركيب الصورة',
     },
     prompts: {
       tap: 'المس {x}',
@@ -423,6 +429,9 @@ const I18N = {
       cookIt: 'المس المقلاة لتطبخ!',
       ready: 'جاهز… بالهناء والشفاء!',
       mirror: 'ألبِس شخصيتك كما تحب!',
+      wash: 'افرك بإصبعك لتنظّفه!',
+      allClean: 'نظيف تماماً!',
+      jigsaw: 'رَكِّب القطع لتُكمل الصورة!',
       vehicleQ: {
         fire: 'من يطفئ الحريق؟',
         police: 'من يحمي الناس؟',

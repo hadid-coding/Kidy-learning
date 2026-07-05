@@ -15,7 +15,7 @@ Le choix se fait au tout début : **العربية** (avec interface droite-à-g
 **English**, **Français**. Chaque langue est un parcours totalement séparé — consignes
 vocales, textes et progression indépendants.
 
-## Les 13 jeux fondamentaux
+## Les 14 jeux fondamentaux
 
 Chaque domaine a été choisi parce qu'il est un pilier du développement cognitif à 3 ans :
 
@@ -30,10 +30,11 @@ Chaque domaine a été choisi parce qu'il est un pilier du développement cognit
 | 🐻 Grand et petit | comparaison, sériation (pré-maths) |
 | 🍃 La mémoire | mémoire de travail, attention |
 | 🧩 Le puzzle | motricité fine, rotation mentale (glisser-déposer) |
+| 🖼️ Le puzzle photo *(V2)* | reconstruire une image en 4 puis 9 morceaux (perception visuelle globale, image fantôme en guide) |
 | 🦋 Les suites | logique, raisonnement par motifs (pré-maths) |
-| 🍳 La cuisine *(V2)* | séquençage (suivre une recette), vocabulaire des aliments, patience — le plat cuit puis est servi à l'avatar de l'enfant |
+| 🍳 La cuisine *(V2)* | séquençage (suivre une recette), cuisson animée sur plaque, puis le plat est servi à table et l'avatar de l'enfant le mange bouchée par bouchée |
 | 🖍️ Le dessin *(V2)* | coloriage guidé (toucher-remplir), puis dessin libre au doigt ; vocabulaire des couleurs |
-| 👗 La garde-robe *(V2)* | jeu symbolique (princesse, super-héros…), s'habiller selon la météo et l'occasion |
+| 👗 La garde-robe *(V2)* | jeu symbolique (princesse, super-héros…) : habiller au miroir, **nettoyer les vêtements en frottant les taches** (vie pratique Montessori), s'habiller selon la météo et l'occasion |
 
 ### Progression pédagogique : associer → nommer → appliquer
 

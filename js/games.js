@@ -104,10 +104,11 @@ function runTapRounds(ctx, cfg) {
         grid.querySelectorAll('.choice').forEach(b => { if (b !== btn) b.classList.add('fade'); });
         ctx.sfx.drop();
         if (r.onCorrectFx) r.onCorrectFx();
-        if (r.onCorrectSpeak) ctx.speak(r.onCorrectSpeak + ' — ' + ctx.praiseWord());
+        // parent's recorded praise first, then the vocabulary word
+        if (r.onCorrectSpeak) ctx.praise(() => ctx.speak(r.onCorrectSpeak));
         else ctx.praise();
         round++;
-        const wait = r.winDelay || 1400;
+        const wait = r.winDelay || (r.onCorrectSpeak ? 2100 : 1400);
         setTimeout(() => { round < rounds ? renderRound() : ctx.complete(); }, wait);
       } else {
         ctx.sfx.knock();
@@ -596,7 +597,8 @@ function gameDrawing(ctx) {
       if (!region) return;
       const group = region.closest('[data-group]');
       const targets = group ? group.querySelectorAll('.region') : [region];
-      targets.forEach(t => { t.setAttribute('fill', COLOR_HEX[color]); t.dataset.done = '1'; });
+      // inline style wins over the stylesheet's .region fill rule
+      targets.forEach(t => { t.style.fill = COLOR_HEX[color]; t.dataset.done = '1'; });
       ctx.sfx.drop();
       const all = [...ctx.area.querySelectorAll('.region')].every(r => r.dataset.done);
       if (all) setTimeout(() => ctx.complete(), 1000);
@@ -733,31 +735,77 @@ function gameCooking(ctx) {
   });
 
   function showCook() {
-    tray.innerHTML = `<button class="choice cook-btn"><span class="big-emoji">🍳</span></button>`;
+    // the assembled dish moves onto a hotplate
+    const stage = ctx.area.querySelector('.cook-stage');
+    stage.innerHTML = `
+      <div class="stove">
+        <div class="hotplate"><div class="pan-stack">${stack.innerHTML}</div></div>
+        <div class="stove-base"></div>
+      </div>`;
+    tray.innerHTML = `<button class="choice cook-btn"><span class="big-emoji">🔥</span></button>`;
     ctx.speak(P.cookIt);
     tray.querySelector('.cook-btn').addEventListener('click', function () {
       this.disabled = true;
+      this.classList.add('fade');
+      const plate = stage.querySelector('.hotplate');
+      plate.classList.add('on');
       ctx.sfx.sizzle();
-      stack.classList.add('cooking');
-      const steam = document.createElement('span');
-      steam.className = 'steam';
-      steam.textContent = '💨';
-      stack.appendChild(steam);
-      setTimeout(serve, 2600);
+      setTimeout(() => ctx.sfx.sizzle(), 1600);
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const steam = document.createElement('span');
+          steam.className = 'steam';
+          steam.style.left = (30 + i * 20) + '%';
+          steam.textContent = '💨';
+          plate.appendChild(steam);
+        }, 300 + i * 900);
+      }
+      setTimeout(serve, 3400);
     }, { once: true });
   }
 
   function serve() {
-    ctx.area.querySelector('.cook-stage').innerHTML = `
-      <div class="serve-scene">
-        <span class="dish-result">${R.result}</span>
-        <span class="serve-avatar">${avatarSVG(ctx.avatarCfg)}</span>
-      </div>`;
+    // served at the table — the child's avatar eats it, bite by bite
+    const stage = ctx.area.querySelector('.cook-stage');
     ctx.area.querySelector('.tray').innerHTML = '';
     ctx.area.querySelector('.recipe-strip').innerHTML = '';
+    stage.innerHTML = `
+      <div class="table-scene">
+        <span class="serve-avatar">${avatarSVG(ctx.avatarCfg)}</span>
+        <div class="table">
+          <span class="dish-result">${R.result}</span>
+          <div class="table-top"></div>
+          <div class="table-leg l"></div><div class="table-leg r"></div>
+        </div>
+      </div>`;
     ctx.sfx.birds();
-    ctx.speak(`${P.ready}`);
-    setTimeout(() => ctx.complete(), 2600);
+    ctx.speak(P.ready);
+    const avatarEl = stage.querySelector('.serve-avatar');
+    const dishEl = stage.querySelector('.dish-result');
+    const bites = [1, 0.8, 0.6, 0.4];
+    let bite = 0;
+    setTimeout(startChewing, 1400); // let "it's ready!" be heard first
+    function startChewing() {
+    const chew = setInterval(() => {
+      if (!document.body.contains(dishEl)) { clearInterval(chew); return; }
+      avatarEl.innerHTML = avatarSVG(Object.assign({}, ctx.avatarCfg, { mouth: bite % 2 ? 'open' : '' }));
+      if (bite % 2 === 0 && bite / 2 < bites.length) {
+        ctx.sfx.crunch();
+        dishEl.style.transform = `scale(${bites[bite / 2]})`;
+        dishEl.style.opacity = bites[bite / 2];
+      }
+      bite++;
+      if (bite > 8) {
+        clearInterval(chew);
+        dishEl.textContent = '🍽️';
+        dishEl.style.transform = '';
+        dishEl.style.opacity = 1;
+        avatarEl.innerHTML = avatarSVG(ctx.avatarCfg);
+        ctx.praise();
+        setTimeout(() => ctx.complete(), 1300);
+      }
+    }, 480);
+    }
   }
 }
 
@@ -789,6 +837,14 @@ function gameVehicles(ctx) {
   const P = ctx.L.prompts;
   const IDS = Object.keys(VEHICLE_EMOJI);
 
+  // on every correct answer the vehicle drives across a little road,
+  // with its own (synthesized) real-world sound
+  const driveOff = (target) => () => {
+    const road = ctx.area.querySelector('.road');
+    if (road) road.innerHTML = `<span class="veh">${VEHICLE_EMOJI[target]}</span>`;
+    setTimeout(() => VEHICLE_SOUND[target](), 250);
+  };
+
   if (ctx.level < 3) {
     runTapRounds(ctx, {
       makeRound(level) {
@@ -799,12 +855,13 @@ function gameVehicles(ctx) {
             key: target,
             promptText: fmt(P.tap, W[target][1]),
             promptVisual: `<span class="prompt-emoji">${VEHICLE_EMOJI[target]}</span>`,
+            field: '<div class="road"></div>',
             choices: shuffle(opts.map(v => ({
               html: `<span class="big-emoji">${VEHICLE_EMOJI[v]}</span>`,
               correct: v === target,
             }))),
-            onCorrectFx: () => setTimeout(() => VEHICLE_SOUND[target](), 350),
-            winDelay: 2400,
+            onCorrectFx: driveOff(target),
+            winDelay: 3100,
           };
         }
         const target = pick1(IDS);
@@ -812,13 +869,14 @@ function gameVehicles(ctx) {
         return {
           key: target,
           promptText: P.vehicleQ[target],
+          field: '<div class="road"></div>',
           choices: opts.map(v => ({
             html: `<span class="big-emoji">${VEHICLE_EMOJI[v]}</span>`,
             correct: v === target,
           })),
-          onCorrectFx: () => setTimeout(() => VEHICLE_SOUND[target](), 350),
+          onCorrectFx: driveOff(target),
           onCorrectSpeak: W[target][1],
-          winDelay: 2400,
+          winDelay: 3100,
         };
       },
     });
@@ -936,10 +994,87 @@ function gameDressup(ctx) {
     return;
   }
 
-  // levels 2 & 3: dress for the weather / for the occasion
+  if (ctx.level === 2) {
+    // caring for the clothes: rub the stains away (practical-life play)
+    const items = ['👗', '🧥', '👑'];
+    let item = 0;
+
+    function renderWash() {
+      const dots = items.map((_, i) =>
+        `<span class="dot${i < item ? ' done' : ''}${i === item ? ' now' : ''}"></span>`).join('');
+      ctx.area.innerHTML = `
+        <div class="prompt-bar">
+          <button class="speak-btn" aria-label="repeat">🔊</button>
+          <div class="prompt-text">${P.wash}</div>
+        </div>
+        <div class="wash-zone">
+          <span class="wash-item">${items[item]}</span>
+        </div>
+        <div class="progress-dots">${dots}</div>`;
+      ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.wash));
+      setTimeout(() => ctx.speak(P.wash), 450);
+
+      const zone = ctx.area.querySelector('.wash-zone');
+      const spots = [[38, 30], [58, 42], [42, 58], [62, 66]];
+      spots.forEach(([x, y]) => {
+        const s = document.createElement('span');
+        s.className = 'stain';
+        s.style.left = x + '%';
+        s.style.top = y + '%';
+        s.dataset.hp = 4;
+        zone.appendChild(s);
+      });
+
+      let scrubbing = false;
+      let lastPop = 0;
+      zone.addEventListener('pointerdown', (e) => { scrubbing = true; zone.setPointerCapture(e.pointerId); });
+      ['pointerup', 'pointercancel'].forEach(ev => zone.addEventListener(ev, () => { scrubbing = false; }));
+      zone.addEventListener('pointermove', (e) => {
+        if (!scrubbing) return;
+        zone.querySelectorAll('.stain').forEach(st => {
+          const r = st.getBoundingClientRect();
+          if (e.clientX > r.left - 8 && e.clientX < r.right + 8 &&
+              e.clientY > r.top - 8 && e.clientY < r.bottom + 8) {
+            const hp = +st.dataset.hp - 1;
+            st.dataset.hp = hp;
+            st.style.opacity = hp / 4;
+            const now = Date.now();
+            if (now - lastPop > 180) {
+              lastPop = now;
+              ctx.sfx.bubble();
+              const b = document.createElement('span');
+              b.className = 'wash-bubble';
+              b.textContent = '🫧';
+              b.style.left = (e.clientX - zone.getBoundingClientRect().left) + 'px';
+              b.style.top = (e.clientY - zone.getBoundingClientRect().top) + 'px';
+              zone.appendChild(b);
+              setTimeout(() => b.remove(), 900);
+            }
+            if (hp <= 0) {
+              st.remove();
+              ctx.sfx.drop();
+              if (!zone.querySelector('.stain')) {
+                const sparkle = document.createElement('span');
+                sparkle.className = 'wash-sparkle';
+                sparkle.textContent = '✨';
+                zone.appendChild(sparkle);
+                ctx.speak(P.allClean + ' ' + ctx.praiseWord());
+                item++;
+                setTimeout(() => { item < items.length ? renderWash() : ctx.complete(); }, 1700);
+              }
+            }
+          }
+        });
+      });
+    }
+    renderWash();
+    return;
+  }
+
+  // level 3: dress for the weather and for the occasion (mixed riddles)
   runTapRounds(ctx, {
-    makeRound(level) {
-      if (level === 2) {
+    makeRound() {
+      if (Math.random() < 0.5) {
         const qa = pick1(WEATHER_QA);
         const others = pickN(CLOTHES_POOL.filter(c => c !== qa.a), 2);
         return {
@@ -964,6 +1099,125 @@ function gameDressup(ctx) {
   });
 }
 
+/* ---------- 14. Picture puzzle (rebuild a sliced picture) ---------- */
+const JIGSAW_PICS = ['🏡', '🚒', '🦁', '🐠', '🌻', '🍉', '🦒', '🌈'];
+
+function gameJigsaw(ctx) {
+  const n = ctx.level === 1 ? 2 : 3;            // 2×2 or 3×3 grid
+  const prePlaced = ctx.level === 2 ? 4 : 0;    // level 2 scaffolds with 4 fixed pieces
+  const boards = 3;
+  let board = 0;
+  let usedPics = [];
+
+  function windowHTML(emoji, i, B, S) {
+    const c = i % n, r = Math.floor(i / n);
+    return `<span class="jig-win" style="width:${B}px;height:${B}px;
+      left:${-c * S}px;top:${-r * S}px;font-size:${B * 0.88}px">${emoji}</span>`;
+  }
+
+  function renderBoard() {
+    const emoji = pick1(JIGSAW_PICS.filter(p => !usedPics.includes(p)));
+    usedPics.push(emoji);
+    const total = n * n;
+    const fixed = shuffle([...Array(total).keys()]).slice(0, prePlaced);
+    let placed = fixed.length;
+
+    const dots = Array.from({ length: boards }, (_, i) =>
+      `<span class="dot${i < board ? ' done' : ''}${i === board ? ' now' : ''}"></span>`).join('');
+    ctx.area.innerHTML = `
+      <div class="prompt-bar">
+        <button class="speak-btn" aria-label="repeat">🔊</button>
+        <div class="prompt-text">${ctx.L.prompts.jigsaw}</div>
+      </div>
+      <div class="jig-board">
+        <div class="jig-ghost"></div>
+        <div class="jig-grid" style="grid-template-columns:repeat(${n},1fr)">
+          ${Array.from({ length: total }, (_, i) =>
+            `<div class="jig-slot" data-i="${i}"></div>`).join('')}
+        </div>
+      </div>
+      <div class="jig-tray">
+        ${shuffle([...Array(total).keys()].filter(i => !fixed.includes(i))).map(i =>
+          `<div class="jig-piece" data-i="${i}"></div>`).join('')}
+      </div>
+      <div class="progress-dots">${dots}</div>`;
+
+    ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(ctx.L.prompts.jigsaw));
+    setTimeout(() => ctx.speak(ctx.L.prompts.jigsaw), 450);
+
+    // exact pixel math so ghost, slots and pieces all line up
+    const boardEl = ctx.area.querySelector('.jig-board');
+    const B = boardEl.clientWidth;
+    const S = B / n;
+    const ghost = ctx.area.querySelector('.jig-ghost');
+    ghost.innerHTML = `<span class="jig-win" style="width:${B}px;height:${B}px;left:0;top:0;font-size:${B * 0.88}px">${emoji}</span>`;
+    fixed.forEach(i => {
+      const slot = ctx.area.querySelector(`.jig-slot[data-i="${i}"]`);
+      slot.classList.add('filled');
+      slot.innerHTML = windowHTML(emoji, i, B, S);
+    });
+    ctx.area.querySelectorAll('.jig-piece').forEach(piece => {
+      const i = +piece.dataset.i;
+      piece.style.width = piece.style.height = S + 'px';
+      piece.innerHTML = windowHTML(emoji, i, B, S);
+    });
+
+    ctx.area.querySelectorAll('.jig-piece').forEach(piece => {
+      let sx = 0, sy = 0, dragging = false;
+      piece.addEventListener('pointerdown', (e) => {
+        if (piece.classList.contains('placed')) return;
+        dragging = true;
+        sx = e.clientX; sy = e.clientY;
+        piece.setPointerCapture(e.pointerId);
+        piece.classList.add('dragging');
+        ctx.sfx.tap();
+      });
+      piece.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        piece.style.transform = `translate(${e.clientX - sx}px, ${e.clientY - sy}px) scale(1.08)`;
+      });
+      piece.addEventListener('pointerup', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        piece.classList.remove('dragging');
+        const pr = piece.getBoundingClientRect();
+        const cx = pr.left + pr.width / 2, cy = pr.top + pr.height / 2;
+        const slot = ctx.area.querySelector(`.jig-slot[data-i="${piece.dataset.i}"]`);
+        const r = slot.getBoundingClientRect();
+        if (cx > r.left - 20 && cx < r.right + 20 && cy > r.top - 20 && cy < r.bottom + 20) {
+          slot.classList.add('filled');
+          slot.innerHTML = piece.innerHTML;
+          piece.classList.add('placed');
+          piece.style.transform = '';
+          ctx.sfx.drop();
+          placed++;
+          if (placed === n * n) {
+            ctx.sfx.birds();
+            ctx.praise();
+            board++;
+            setTimeout(() => { board < boards ? renderBoard() : ctx.complete(); }, 1600);
+          }
+        } else {
+          const over = [...ctx.area.querySelectorAll('.jig-slot:not(.filled)')].some(s => {
+            const sr = s.getBoundingClientRect();
+            return cx > sr.left && cx < sr.right && cy > sr.top && cy < sr.bottom;
+          });
+          if (over) { ctx.sfx.knock(); ctx.encourage(); }
+          piece.classList.add('returning');
+          piece.style.transform = '';
+          setTimeout(() => piece.classList.remove('returning'), 450);
+        }
+      });
+      piece.addEventListener('pointercancel', () => {
+        dragging = false;
+        piece.classList.remove('dragging');
+        piece.style.transform = '';
+      });
+    });
+  }
+  renderBoard();
+}
+
 /* ---------- registry ---------- */
 const GAMES = [
   { id: 'colors', icon: '🎨', hue: '#F6D0CB', start: gameColors },
@@ -975,6 +1229,7 @@ const GAMES = [
   { id: 'sizes', icon: '🐻', hue: '#F3DCC4', start: gameSizes },
   { id: 'memory', icon: '🍃', hue: '#D8EBDB', start: gameMemory },
   { id: 'puzzle', icon: '🧩', hue: '#E5D6EF', start: gamePuzzle },
+  { id: 'jigsaw', icon: '🖼️', hue: '#DCE9D5', start: gameJigsaw },
   { id: 'patterns', icon: '🦋', hue: '#F9E1EB', start: gamePatterns },
   { id: 'cooking', icon: '🍳', hue: '#F4E0B9', start: gameCooking },
   { id: 'drawing', icon: '🖍️', hue: '#F9D8D0', start: gameDrawing },

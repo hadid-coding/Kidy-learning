@@ -49,7 +49,7 @@
   const speak = (text) => Voice.speak(text, L().tts);
   const praiseWord = () => pick1(L().praise);
   // plays the parent's recording when one exists, else speech synthesis
-  const speakSlot = (slot, text) => Voice.speakSlot(slot, text, L().tts);
+  const speakSlot = (slot, text, onEnd) => Voice.speakSlot(slot, text, L().tts, onEnd);
 
   /* ---------- screens ---------- */
 
@@ -160,7 +160,7 @@
       speak,
       sfx: AudioFX,
       praiseWord,
-      praise() { speakSlot('praise', praiseWord()); },
+      praise(then) { speakSlot('praise', praiseWord(), then); },
       encourage() { speakSlot('tryAgain', L().ui.tryAgain); },
       avatarCfg: state.settings.avatar,
       saveAvatar(cfg) {
