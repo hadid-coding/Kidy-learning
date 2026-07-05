@@ -1,6 +1,6 @@
 /* Kidy service worker — makes the app installable and fully usable offline.
    Bump the version whenever any file changes so installed devices update. */
-const CACHE = 'kidy-v2.1.0';
+const CACHE = 'kidy-v2.1.1';
 const ASSETS = [
   './',
   './index.html',
