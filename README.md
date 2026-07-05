@@ -15,7 +15,7 @@ Le choix se fait au tout début : **العربية** (avec interface droite-à-g
 **English**, **Français**. Chaque langue est un parcours totalement séparé — consignes
 vocales, textes et progression indépendants.
 
-## Les 8 jeux fondamentaux
+## Les 13 jeux fondamentaux
 
 Chaque domaine a été choisi parce qu'il est un pilier du développement cognitif à 3 ans :
 
@@ -24,11 +24,16 @@ Chaque domaine a été choisi parce qu'il est un pilier du développement cognit
 | 🎨 Les couleurs | discrimination visuelle, vocabulaire |
 | 🔷 Les formes | pré-géométrie, catégorisation |
 | 🔢 Les nombres | dénombrement, sens du nombre (1→10) |
+| 🔤 Les lettres *(V2)* | reconnaissance de l'alphabet (arabe/latin), conscience du premier son |
 | 🐘 Les animaux | vocabulaire, connaissance du monde |
+| 🚒 Les véhicules *(V2)* | métiers et services (pompiers, police…), fonction des engins, sons réels animés |
 | 🐻 Grand et petit | comparaison, sériation (pré-maths) |
 | 🍃 La mémoire | mémoire de travail, attention |
 | 🧩 Le puzzle | motricité fine, rotation mentale (glisser-déposer) |
 | 🦋 Les suites | logique, raisonnement par motifs (pré-maths) |
+| 🍳 La cuisine *(V2)* | séquençage (suivre une recette), vocabulaire des aliments, patience — le plat cuit puis est servi à l'avatar de l'enfant |
+| 🖍️ Le dessin *(V2)* | coloriage guidé (toucher-remplir), puis dessin libre au doigt ; vocabulaire des couleurs |
+| 👗 La garde-robe *(V2)* | jeu symbolique (princesse, super-héros…), s'habiller selon la météo et l'occasion |
 
 ### Progression pédagogique : associer → nommer → appliquer
 
@@ -65,9 +70,38 @@ concentration façon « shorts ») :
 ## 👨‍👩‍👧 Espace parents
 
 Accessible via un bouton discret **protégé par un appui long de 3 secondes**
-(infranchissable pour un enfant de 3 ans). On y règle : le prénom de l'enfant
-(utilisé dans les félicitations vocales), la voix, les sons, la durée avant pause,
-le changement de langue, la remise à zéro — et on y lit le résumé de la méthode.
+(infranchissable pour un enfant de 3 ans). On y règle :
+
+- le **prénom de l'enfant** (utilisé dans les félicitations vocales) ;
+- l'**avatar de l'enfant** *(V2)* : peau, coiffure (dont hijab), couleur — un
+  personnage simple et fini, **sans boutique ni objets à débloquer** : c'est de
+  l'identité, pas de la récompense. L'enfant l'habille ensuite lui-même dans le
+  jeu Garde-robe, et le retrouve partout (accueil, félicitations, repas servi) ;
+- 🎙️ **votre voix** *(V2)* : enregistrez « Bravo ! », « Essaie encore », la fin de
+  niveau et l'annonce de pause **avec votre propre voix** — Kidy les joue à la
+  place de la voix de synthèse. Entendre papa/maman est plus chaleureux et plus
+  efficace pédagogiquement. Les enregistrements restent **sur l'appareil**
+  (IndexedDB), rien n'est envoyé sur internet ; un jeu d'enregistrements par langue ;
+- la voix de synthèse, les sons, la durée avant pause, la langue, la remise à zéro,
+  et le résumé de la méthode.
+
+## 📲 Installer sur tablette / téléphone (V2 — PWA hors-ligne)
+
+Kidy est une **Progressive Web App** : une fois installée, elle se lance comme une
+vraie application, **en plein écran et sans internet**.
+
+Depuis `https://hadid-coding.github.io/Kidy-learning` :
+
+- **iPad / iPhone (Safari)** : bouton **Partager** (carré avec flèche) →
+  **« Sur l'écran d'accueil »** → Ajouter. L'icône 🌱 Kidy apparaît.
+- **Tablette / téléphone Android (Chrome)** : menu **⋮** →
+  **« Installer l'application »** (ou la bannière d'installation qui s'affiche).
+
+Ouvrez l'application une première fois avec internet ; ensuite tout fonctionne
+hors-ligne (le service worker met tous les fichiers en cache et se met à jour
+tout seul quand une nouvelle version est publiée).
+
+> ⚠️ Sur iPad, utilisez bien **Safari** pour l'installation (exigence d'Apple).
 
 ## Lancer / héberger
 
@@ -77,6 +111,7 @@ python3 -m http.server 8080   # puis http://localhost:8080
 ```
 
 Pour GitHub Pages : Settings → Pages → déployer depuis la branche, dossier racine.
+(Déjà en ligne : https://hadid-coding.github.io/Kidy-learning)
 
 > 💡 Conseil : la synthèse vocale arabe dépend des voix installées sur l'appareil.
 > Sur Android/iOS elle est généralement disponible ; sinon les consignes restent
@@ -85,10 +120,15 @@ Pour GitHub Pages : Settings → Pages → déployer depuis la branche, dossier 
 ## Structure du code
 
 ```
-index.html        point d'entrée (aucun build nécessaire)
-css/style.css     design apaisé, RTL, animations douces
-js/i18n.js        traductions complètes ar / en / fr
-js/audio.js       sons naturels synthétisés + voix (Web Audio / Speech API)
-js/games.js       les 8 jeux et leur pédagogie à 3 niveaux
-js/app.js         navigation, progression (localStorage), espace parents, pauses
+index.html             point d'entrée (aucun build nécessaire)
+manifest.webmanifest   installation PWA (icône, plein écran)
+sw.js                  service worker : cache hors-ligne + mises à jour
+icons/                 icônes de l'application
+css/style.css          design apaisé, RTL, animations douces
+js/i18n.js             traductions complètes ar / en / fr
+js/audio.js            sons naturels + sons de véhicules synthétisés,
+                       voix de synthèse, enregistrements parents (IndexedDB)
+js/avatar.js           l'avatar SVG de l'enfant (base + tenues)
+js/games.js            les 13 jeux et leur pédagogie à 3 niveaux
+js/app.js              navigation, progression, espace parents, pauses, PWA
 ```

@@ -103,14 +103,16 @@ function runTapRounds(ctx, cfg) {
         btn.classList.add('win');
         grid.querySelectorAll('.choice').forEach(b => { if (b !== btn) b.classList.add('fade'); });
         ctx.sfx.drop();
-        const extra = r.onCorrectSpeak ? r.onCorrectSpeak + ' — ' : '';
-        ctx.speak(extra + ctx.praiseWord());
+        if (r.onCorrectFx) r.onCorrectFx();
+        if (r.onCorrectSpeak) ctx.speak(r.onCorrectSpeak + ' — ' + ctx.praiseWord());
+        else ctx.praise();
         round++;
-        setTimeout(() => { round < rounds ? renderRound() : ctx.complete(); }, 1400);
+        const wait = r.winDelay || 1400;
+        setTimeout(() => { round < rounds ? renderRound() : ctx.complete(); }, wait);
       } else {
         ctx.sfx.knock();
         btn.classList.add('shake');
-        ctx.speak(ctx.L.ui.tryAgain);
+        ctx.encourage();
         setTimeout(() => btn.classList.remove('shake'), 600);
       }
     });
@@ -329,7 +331,7 @@ function gameMemory(ctx) {
     if (a.dataset.f === card.dataset.f) {
       a.classList.add('matched'); card.classList.add('matched');
       ctx.sfx.drop();
-      ctx.speak(ctx.praiseWord());
+      ctx.praise();
       found++;
       if (found === pairs) setTimeout(() => ctx.complete(), 900);
     } else {
@@ -405,14 +407,14 @@ function gamePuzzle(ctx) {
           piece.classList.add('placed');
           piece.style.transform = '';
           ctx.sfx.drop();
-          ctx.speak(ctx.praiseWord());
+          ctx.praise();
           placed++;
           if (placed === nShapes) {
             board++;
             setTimeout(() => { board < boards ? renderBoard() : ctx.complete(); }, 1300);
           }
         } else {
-          if (hit) { ctx.sfx.knock(); ctx.speak(ctx.L.ui.tryAgain); }
+          if (hit) { ctx.sfx.knock(); ctx.encourage(); }
           piece.classList.add('returning');
           piece.style.transform = '';
           setTimeout(() => piece.classList.remove('returning'), 450);
@@ -456,14 +458,525 @@ function gamePatterns(ctx) {
   });
 }
 
+/* ---------- 9. Letters (alphabet of the chosen language) ---------- */
+function gameLetters(ctx) {
+  const W = ctx.L.words;
+  const P = ctx.L.prompts;
+  const AB = W.alphabet;
+  const nameOf = (ch) => {
+    if (!W.letterNames) return ch;
+    const i = AB.indexOf(ch);
+    return i >= 0 ? W.letterNames[i] : ch;
+  };
+  runTapRounds(ctx, {
+    makeRound(level) {
+      if (level < 3) {
+        const pool = level === 1 ? AB.slice(0, 10) : AB;
+        const opts = pickN(pool, level === 1 ? 3 : 4);
+        const target = pick1(opts);
+        return {
+          key: target,
+          promptText: level === 1 ? P.sameLetter : fmt(P.tapLetter, target),
+          speakText: level === 1
+            ? `${P.sameLetter} : ${nameOf(target)}`
+            : fmt(P.tapLetter, nameOf(target)),
+          promptVisual: level === 1 ? `<span class="prompt-letter">${target}</span>` : null,
+          choices: shuffle(opts.map(l => ({
+            html: `<span class="letter">${l}</span>`,
+            correct: l === target,
+          }))),
+        };
+      }
+      // Level 3 — first-letter awareness: which letter starts this word?
+      const [letter, emoji, word] = pick1(W.letterWords);
+      const others = pickN(AB.filter(l => l !== letter), 2);
+      return {
+        key: word,
+        promptText: fmt(P.letterFor, word),
+        promptVisual: `<span class="prompt-emoji">${emoji}</span>`,
+        choices: shuffle([letter, ...others].map(l => ({
+          html: `<span class="letter">${l}</span>`,
+          correct: l === letter,
+        }))),
+        onCorrectSpeak: `${nameOf(letter)}… ${word}`,
+      };
+    },
+  });
+}
+
+/* ---------- 10. Drawing & coloring ---------- */
+const COLORING_PICTURES = {
+  fish: {
+    vb: '0 0 220 160',
+    svg: `
+      <ellipse class="region" cx="95" cy="80" rx="55" ry="35"/>
+      <path class="region" d="M148 80 L192 52 L192 108 Z"/>
+      <path class="region" d="M75 47 Q95 18 115 47 Z"/>
+      <circle class="region" cx="185" cy="28" r="9"/>
+      <circle class="region" cx="202" cy="50" r="6"/>
+      <circle cx="68" cy="72" r="5" fill="#4E4439" stroke="none"/>`,
+  },
+  flower: {
+    vb: '0 0 220 160',
+    svg: `
+      <g data-group="petals">
+        <circle class="region" cx="136" cy="55" r="16"/>
+        <circle class="region" cx="123" cy="32" r="16"/>
+        <circle class="region" cx="97" cy="32" r="16"/>
+        <circle class="region" cx="84" cy="55" r="16"/>
+        <circle class="region" cx="97" cy="78" r="16"/>
+        <circle class="region" cx="123" cy="78" r="16"/>
+      </g>
+      <circle class="region" cx="110" cy="55" r="14"/>
+      <rect class="region" x="106" y="70" width="8" height="66" rx="4"/>
+      <ellipse class="region" cx="88" cy="112" rx="15" ry="7" transform="rotate(-25 88 112)"/>
+      <ellipse class="region" cx="132" cy="122" rx="15" ry="7" transform="rotate(25 132 122)"/>`,
+  },
+  house: {
+    vb: '0 0 220 160',
+    svg: `
+      <rect class="region" x="58" y="75" width="90" height="60"/>
+      <path class="region" d="M48 75 L103 36 L158 75 Z"/>
+      <rect class="region" x="92" y="103" width="22" height="32" rx="3"/>
+      <rect class="region" x="68" y="86" width="18" height="18" rx="2"/>
+      <rect class="region" x="120" y="86" width="18" height="18" rx="2"/>
+      <circle class="region" cx="190" cy="28" r="14"/>`,
+  },
+  butterfly: {
+    vb: '0 0 220 160',
+    svg: `
+      <ellipse class="region" cx="80" cy="60" rx="27" ry="23"/>
+      <ellipse class="region" cx="140" cy="60" rx="27" ry="23"/>
+      <ellipse class="region" cx="84" cy="112" rx="21" ry="17"/>
+      <ellipse class="region" cx="136" cy="112" rx="21" ry="17"/>
+      <circle class="region" cx="80" cy="60" r="8"/>
+      <circle class="region" cx="140" cy="60" r="8"/>
+      <circle class="region" cx="84" cy="112" r="6"/>
+      <circle class="region" cx="136" cy="112" r="6"/>
+      <ellipse class="region" cx="110" cy="85" rx="9" ry="33"/>
+      <path d="M104 50 Q96 30 88 24 M116 50 Q124 30 132 24" fill="none" stroke="#4E4439" stroke-width="3" stroke-linecap="round"/>`,
+  },
+};
+const DRAW_PALETTE = ['red', 'blue', 'yellow', 'green', 'orange', 'purple', 'pink', 'brown'];
+
+function paletteHTML(selected) {
+  return `<div class="palette">${DRAW_PALETTE.map(c =>
+    `<button class="pal-dot ${c === selected ? 'sel' : ''}" data-c="${c}"
+       style="background:${COLOR_HEX[c]}"></button>`).join('')}</div>`;
+}
+
+function gameDrawing(ctx) {
+  const P = ctx.L.prompts;
+  let color = 'red';
+
+  if (ctx.level < 3) {
+    const pic = COLORING_PICTURES[pick1(ctx.level === 1 ? ['fish', 'flower'] : ['house', 'butterfly'])];
+    ctx.area.innerHTML = `
+      <div class="prompt-bar">
+        <button class="speak-btn" aria-label="repeat">🔊</button>
+        <div class="prompt-text">${P.colorIt}</div>
+      </div>
+      <div class="coloring-wrap">
+        <svg viewBox="${pic.vb}">${pic.svg}</svg>
+      </div>
+      ${paletteHTML(color)}`;
+    ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.colorIt));
+    setTimeout(() => ctx.speak(P.colorIt), 450);
+
+    ctx.area.querySelector('.palette').addEventListener('click', (e) => {
+      const d = e.target.closest('.pal-dot');
+      if (!d) return;
+      color = d.dataset.c;
+      ctx.area.querySelectorAll('.pal-dot').forEach(x => x.classList.toggle('sel', x === d));
+      ctx.sfx.tap();
+      ctx.speak(ctx.L.words.colors[color][0]); // color vocabulary while playing
+    });
+    ctx.area.querySelector('.coloring-wrap svg').addEventListener('click', (e) => {
+      const region = e.target.closest('.region');
+      if (!region) return;
+      const group = region.closest('[data-group]');
+      const targets = group ? group.querySelectorAll('.region') : [region];
+      targets.forEach(t => { t.setAttribute('fill', COLOR_HEX[color]); t.dataset.done = '1'; });
+      ctx.sfx.drop();
+      const all = [...ctx.area.querySelectorAll('.region')].every(r => r.dataset.done);
+      if (all) setTimeout(() => ctx.complete(), 1000);
+    });
+    return;
+  }
+
+  // Level 3 — free drawing on a canvas
+  ctx.area.innerHTML = `
+    <div class="prompt-bar">
+      <button class="speak-btn" aria-label="repeat">🔊</button>
+      <div class="prompt-text">${P.freeDraw}</div>
+    </div>
+    <div class="canvas-wrap"><canvas class="draw-canvas"></canvas></div>
+    <div class="draw-tools">
+      ${paletteHTML(color)}
+      <button class="tool-btn" data-tool="erase">🧽</button>
+      <button class="tool-btn" data-tool="clear">🗑️</button>
+      <button class="btn-big btn-done">${ctx.L.ui.done}</button>
+    </div>`;
+  ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.freeDraw));
+  setTimeout(() => ctx.speak(P.freeDraw), 450);
+
+  const canvas = ctx.area.querySelector('.draw-canvas');
+  const wrap = ctx.area.querySelector('.canvas-wrap');
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext('2d');
+  g.scale(dpr, dpr);
+  g.lineCap = g.lineJoin = 'round';
+  let erasing = false, drawing = false, drew = false;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    drawing = true; drew = true;
+    canvas.setPointerCapture(e.pointerId);
+    const r = canvas.getBoundingClientRect();
+    g.beginPath();
+    g.moveTo(e.clientX - r.left, e.clientY - r.top);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return;
+    const r = canvas.getBoundingClientRect();
+    g.strokeStyle = erasing ? '#FFFFFF' : COLOR_HEX[color];
+    g.lineWidth = erasing ? 34 : 14;
+    g.lineTo(e.clientX - r.left, e.clientY - r.top);
+    g.stroke();
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => canvas.addEventListener(ev, () => { drawing = false; }));
+
+  ctx.area.querySelector('.palette').addEventListener('click', (e) => {
+    const d = e.target.closest('.pal-dot');
+    if (!d) return;
+    color = d.dataset.c; erasing = false;
+    ctx.area.querySelectorAll('.pal-dot').forEach(x => x.classList.toggle('sel', x === d));
+    ctx.sfx.tap();
+    ctx.speak(ctx.L.words.colors[color][0]);
+  });
+  ctx.area.querySelectorAll('.tool-btn').forEach(b => b.addEventListener('click', () => {
+    ctx.sfx.tap();
+    if (b.dataset.tool === 'clear') g.clearRect(0, 0, w, h);
+    else erasing = true;
+  }));
+  ctx.area.querySelector('.btn-done').addEventListener('click', () => {
+    if (drew) ctx.complete();
+  });
+}
+
+/* ---------- 11. Cooking (follow the recipe, cook, serve) ---------- */
+const INGREDIENT_EMOJI = {
+  bread: '🍞', tomato: '🍅', cheese: '🧀', lettuce: '🥬', meat: '🥩',
+  egg: '🥚', cucumber: '🥒', carrot: '🥕', mushroom: '🍄', olive: '🫒',
+  pepper: '🫑', dough: '🫓',
+};
+const RECIPES = [
+  { dish: 'sandwich', result: '🥪', steps: ['bread', 'cheese', 'tomato'], extra: ['mushroom', 'egg'] },
+  { dish: 'burger', result: '🍔', steps: ['bread', 'meat', 'cheese', 'lettuce', 'tomato'], extra: ['olive', 'cucumber'] },
+  { dish: 'pizza', result: '🍕', steps: ['dough', 'tomato', 'cheese', 'mushroom', 'olive', 'pepper'], extra: ['egg', 'carrot'] },
+];
+
+function gameCooking(ctx) {
+  const P = ctx.L.prompts;
+  const W = ctx.L.words.ingredients;
+  const R = RECIPES[ctx.level - 1];
+  let idx = 0;
+
+  function strip() {
+    return R.steps.map((s, i) =>
+      `<span class="step ${i < idx ? 'ok' : ''} ${i === idx ? 'next' : ''}">${INGREDIENT_EMOJI[s]}</span>`).join('');
+  }
+
+  ctx.area.innerHTML = `
+    <div class="prompt-bar">
+      <button class="speak-btn" aria-label="repeat">🔊</button>
+      <div class="prompt-text">${P.recipeFollow}</div>
+    </div>
+    <div class="recipe-strip">${strip()}</div>
+    <div class="cook-stage">
+      <div class="stack"><span class="plate">🍽️</span></div>
+    </div>
+    <div class="tray">
+      ${shuffle(R.steps.concat(R.extra)).map(s =>
+        `<button class="choice tray-item" data-id="${s}">
+           <span class="big-emoji">${INGREDIENT_EMOJI[s]}</span>
+         </button>`).join('')}
+    </div>`;
+  ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.recipeFollow));
+  setTimeout(() => ctx.speak(P.recipeFollow), 450);
+
+  const stack = ctx.area.querySelector('.stack');
+  const tray = ctx.area.querySelector('.tray');
+
+  tray.addEventListener('click', (e) => {
+    const item = e.target.closest('.tray-item');
+    if (!item || item.disabled) return;
+    if (item.dataset.id === R.steps[idx]) {
+      item.disabled = true;
+      item.classList.add('fade');
+      const layer = document.createElement('span');
+      layer.className = 'layer';
+      layer.textContent = INGREDIENT_EMOJI[item.dataset.id];
+      stack.appendChild(layer);
+      ctx.sfx.drop();
+      ctx.speak(W[item.dataset.id]);
+      idx++;
+      ctx.area.querySelector('.recipe-strip').innerHTML = strip();
+      if (idx === R.steps.length) setTimeout(showCook, 900);
+    } else {
+      ctx.sfx.knock();
+      item.classList.add('shake');
+      ctx.encourage();
+      setTimeout(() => item.classList.remove('shake'), 600);
+    }
+  });
+
+  function showCook() {
+    tray.innerHTML = `<button class="choice cook-btn"><span class="big-emoji">🍳</span></button>`;
+    ctx.speak(P.cookIt);
+    tray.querySelector('.cook-btn').addEventListener('click', function () {
+      this.disabled = true;
+      ctx.sfx.sizzle();
+      stack.classList.add('cooking');
+      const steam = document.createElement('span');
+      steam.className = 'steam';
+      steam.textContent = '💨';
+      stack.appendChild(steam);
+      setTimeout(serve, 2600);
+    }, { once: true });
+  }
+
+  function serve() {
+    ctx.area.querySelector('.cook-stage').innerHTML = `
+      <div class="serve-scene">
+        <span class="dish-result">${R.result}</span>
+        <span class="serve-avatar">${avatarSVG(ctx.avatarCfg)}</span>
+      </div>`;
+    ctx.area.querySelector('.tray').innerHTML = '';
+    ctx.area.querySelector('.recipe-strip').innerHTML = '';
+    ctx.sfx.birds();
+    ctx.speak(`${P.ready}`);
+    setTimeout(() => ctx.complete(), 2600);
+  }
+}
+
+/* ---------- 12. Vehicles (name → function → mission + motion & sound) ---------- */
+const VEHICLE_EMOJI = {
+  fire: '🚒', police: '🚓', ambulance: '🚑', bus: '🚌',
+  tractor: '🚜', crane: '🏗️', truck: '🚛', train: '🚂',
+};
+const VEHICLE_SOUND = {
+  fire: () => AudioFX.siren('hilo'),
+  police: () => AudioFX.siren('wail'),
+  ambulance: () => AudioFX.siren('fast'),
+  bus: () => AudioFX.horn(false),
+  tractor: () => AudioFX.engine(),
+  crane: () => AudioFX.clicks(),
+  truck: () => AudioFX.horn(true),
+  train: () => AudioFX.whistle(),
+};
+const VEHICLE_MISSIONS = [
+  { key: 'fire', scene: '🔥', a: 'fire' },
+  { key: 'sick', scene: '🤕', a: 'ambulance' },
+  { key: 'school', scene: '🏫', a: 'bus' },
+  { key: 'field', scene: '🌾', a: 'tractor' },
+  { key: 'heavy', scene: '🧱', a: 'crane' },
+];
+
+function gameVehicles(ctx) {
+  const W = ctx.L.words.vehicles;
+  const P = ctx.L.prompts;
+  const IDS = Object.keys(VEHICLE_EMOJI);
+
+  if (ctx.level < 3) {
+    runTapRounds(ctx, {
+      makeRound(level) {
+        if (level === 1) {
+          const opts = pickN(IDS, 3);
+          const target = pick1(opts);
+          return {
+            key: target,
+            promptText: fmt(P.tap, W[target][1]),
+            promptVisual: `<span class="prompt-emoji">${VEHICLE_EMOJI[target]}</span>`,
+            choices: shuffle(opts.map(v => ({
+              html: `<span class="big-emoji">${VEHICLE_EMOJI[v]}</span>`,
+              correct: v === target,
+            }))),
+            onCorrectFx: () => setTimeout(() => VEHICLE_SOUND[target](), 350),
+            winDelay: 2400,
+          };
+        }
+        const target = pick1(IDS);
+        const opts = shuffle([target, ...pickN(IDS.filter(v => v !== target), 2)]);
+        return {
+          key: target,
+          promptText: P.vehicleQ[target],
+          choices: opts.map(v => ({
+            html: `<span class="big-emoji">${VEHICLE_EMOJI[v]}</span>`,
+            correct: v === target,
+          })),
+          onCorrectFx: () => setTimeout(() => VEHICLE_SOUND[target](), 350),
+          onCorrectSpeak: W[target][1],
+          winDelay: 2400,
+        };
+      },
+    });
+    return;
+  }
+
+  // Level 3 — missions: pick the right vehicle, watch it drive off with its sound
+  const missions = shuffle(VEHICLE_MISSIONS);
+  let m = 0;
+
+  function renderMission() {
+    const mission = missions[m];
+    const opts = shuffle([mission.a, ...pickN(IDS.filter(v => v !== mission.a), 2)]);
+    const dots = missions.map((_, i) =>
+      `<span class="dot${i < m ? ' done' : ''}${i === m ? ' now' : ''}"></span>`).join('');
+    ctx.area.innerHTML = `
+      <div class="prompt-bar">
+        <button class="speak-btn" aria-label="repeat">🔊</button>
+        <div class="prompt-visual"><span class="prompt-emoji">${mission.scene}</span></div>
+        <div class="prompt-text">${P.missions[mission.key]}</div>
+      </div>
+      <div class="road"></div>
+      <div class="choices">
+        ${opts.map((v, i) => `<button class="choice" data-i="${i}">
+           <span class="big-emoji">${VEHICLE_EMOJI[v]}</span></button>`).join('')}
+      </div>
+      <div class="progress-dots">${dots}</div>`;
+    ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.missions[mission.key]));
+    setTimeout(() => ctx.speak(P.missions[mission.key]), 450);
+
+    const grid = ctx.area.querySelector('.choices');
+    grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.choice');
+      if (!btn || grid.classList.contains('lock')) return;
+      const v = opts[+btn.dataset.i];
+      if (v === mission.a) {
+        grid.classList.add('lock');
+        btn.classList.add('win');
+        ctx.sfx.drop();
+        const road = ctx.area.querySelector('.road');
+        road.innerHTML = `<span class="veh">${VEHICLE_EMOJI[v]}</span>`;
+        VEHICLE_SOUND[v]();
+        ctx.praise();
+        m++;
+        setTimeout(() => { m < missions.length ? renderMission() : ctx.complete(); }, 3100);
+      } else {
+        ctx.sfx.knock();
+        btn.classList.add('shake');
+        ctx.encourage();
+        setTimeout(() => btn.classList.remove('shake'), 600);
+      }
+    });
+  }
+  renderMission();
+}
+
+/* ---------- 13. Dress up (wardrobe, mirror — pretend play) ---------- */
+const CLOTHES_POOL = ['☂️', '🧥', '👒', '👟', '🧤', '🧣', '👗', '👑', '🕶️', '🧢'];
+const WEATHER_QA = [
+  { key: 'rain', a: '☂️' }, { key: 'cold', a: '🧥' }, { key: 'sun', a: '👒' },
+  { key: 'feet', a: '👟' }, { key: 'hands', a: '🧤' }, { key: 'neck', a: '🧣' },
+];
+const OUTFIT_QA = [
+  { key: 'ball', a: '👗👑', pool: ['🧥🥾', '👕👟'] },
+  { key: 'hero', a: '🦸', pool: ['👗👑', '🧥☂️'] },
+  { key: 'sport', a: '👕👟', pool: ['👗👑', '🧥🧣'] },
+  { key: 'rain', a: '🧥☂️', pool: ['👒🕶️', '👕👟'] },
+];
+
+function gameDressup(ctx) {
+  const P = ctx.L.prompts;
+
+  if (ctx.level === 1) {
+    // mirror mode: free dress-up of the child's own avatar
+    const cfg = Object.assign({}, ctx.avatarCfg);
+    function render() {
+      ctx.area.innerHTML = `
+        <div class="prompt-bar">
+          <button class="speak-btn" aria-label="repeat">🔊</button>
+          <div class="prompt-text">${P.mirror}</div>
+        </div>
+        <div class="mirror">${avatarSVG(cfg, 'mirror-avatar')}</div>
+        <div class="wardrobe">
+          <div class="option-row" data-k="outfit">
+            ${AVATAR_OUTFITS.map(o => `<button class="opt ${cfg.outfit === o ? 'sel' : ''}" data-v="${o}">
+              ${o === 'shirt' ? '👕' : o === 'dress' ? '👗' : '🦸'}</button>`).join('')}
+          </div>
+          <div class="option-row" data-k="head">
+            ${AVATAR_HEADWEAR.map(hw => `<button class="opt ${cfg.head === hw ? 'sel' : ''}" data-v="${hw}">
+              ${hw === 'none' ? '∅' : hw === 'crown' ? '👑' : hw === 'hat' ? '👒' : '🎭'}</button>`).join('')}
+          </div>
+          <div class="option-row" data-k="outfitColor">
+            ${AVATAR_OUTFIT_COLORS.map((cc, i) => `<button class="opt dot-opt ${cfg.outfitColor === i ? 'sel' : ''}"
+              data-v="${i}" style="background:${cc}"></button>`).join('')}
+          </div>
+          <button class="btn-big btn-done">${ctx.L.ui.done}</button>
+        </div>`;
+      ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(P.mirror));
+      ctx.area.querySelectorAll('.option-row').forEach(row =>
+        row.addEventListener('click', (e) => {
+          const b = e.target.closest('.opt');
+          if (!b) return;
+          const k = row.dataset.k;
+          cfg[k] = k === 'outfitColor' ? +b.dataset.v : b.dataset.v;
+          ctx.sfx.tap();
+          render();
+        }));
+      ctx.area.querySelector('.btn-done').addEventListener('click', () => {
+        ctx.saveAvatar(cfg); // the outfit stays on their avatar everywhere
+        ctx.complete();
+      });
+    }
+    render();
+    setTimeout(() => ctx.speak(P.mirror), 450);
+    return;
+  }
+
+  // levels 2 & 3: dress for the weather / for the occasion
+  runTapRounds(ctx, {
+    makeRound(level) {
+      if (level === 2) {
+        const qa = pick1(WEATHER_QA);
+        const others = pickN(CLOTHES_POOL.filter(c => c !== qa.a), 2);
+        return {
+          key: qa.key,
+          promptText: P.weatherQ[qa.key],
+          choices: shuffle([qa.a, ...others].map(c => ({
+            html: `<span class="big-emoji">${c}</span>`,
+            correct: c === qa.a,
+          }))),
+        };
+      }
+      const qa = pick1(OUTFIT_QA);
+      return {
+        key: qa.key,
+        promptText: P.outfitQ[qa.key],
+        choices: shuffle([qa.a, ...qa.pool].map(c => ({
+          html: `<span class="outfit-combo">${c}</span>`,
+          correct: c === qa.a,
+        }))),
+      };
+    },
+  });
+}
+
 /* ---------- registry ---------- */
 const GAMES = [
   { id: 'colors', icon: '🎨', hue: '#F6D0CB', start: gameColors },
-  { id: 'shapes', icon: '🔷', hue: '#CBDcF2', start: gameShapes },
+  { id: 'shapes', icon: '🔷', hue: '#CBDCF2', start: gameShapes },
   { id: 'counting', icon: '🔢', hue: '#F4E6BC', start: gameCounting },
+  { id: 'letters', icon: '🔤', hue: '#F5E0C8', start: gameLetters },
   { id: 'animals', icon: '🐘', hue: '#CDE7C8', start: gameAnimals },
+  { id: 'vehicles', icon: '🚒', hue: '#CFE3EE', start: gameVehicles },
   { id: 'sizes', icon: '🐻', hue: '#F3DCC4', start: gameSizes },
   { id: 'memory', icon: '🍃', hue: '#D8EBDB', start: gameMemory },
   { id: 'puzzle', icon: '🧩', hue: '#E5D6EF', start: gamePuzzle },
   { id: 'patterns', icon: '🦋', hue: '#F9E1EB', start: gamePatterns },
+  { id: 'cooking', icon: '🍳', hue: '#F4E0B9', start: gameCooking },
+  { id: 'drawing', icon: '🖍️', hue: '#F9D8D0', start: gameDrawing },
+  { id: 'dressup', icon: '👗', hue: '#EFD7E8', start: gameDressup },
 ];
