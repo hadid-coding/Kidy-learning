@@ -90,6 +90,15 @@ const AudioFX = (() => {
       noise(0.3, 1.6, 'bandpass', 5000, 0.04);
     },
 
+    /* soft munching bite — the avatar enjoying its meal */
+    crunch() {
+      noise(0, 0.1, 'lowpass', 900, 0.12);
+      noise(0.05, 0.08, 'lowpass', 600, 0.08);
+    },
+
+    /* tiny soap bubble pops — washing game */
+    bubble() { tone(900, 1500, 0, 0.07, 0.07); },
+
     /* real-world vehicle sounds, kept quiet and short by design */
     siren(kind) {
       if (kind === 'wail') {
@@ -196,18 +205,31 @@ const Voice = (() => {
       } catch (e) { /* no voice available — visual prompts still work */ }
     },
     /* Plays the parent's own recording for this slot when one exists,
-       otherwise falls back to speech synthesis. */
-    speakSlot(slot, text, lang) {
-      if (!enabled) return;
+       otherwise falls back to speech synthesis. onEnd (optional) runs when
+       the clip/utterance finishes, so callers can chain a spoken word. */
+    speakSlot(slot, text, lang, onEnd) {
+      if (!enabled) { if (onEnd) onEnd(); return; }
       Rec.load(lang.split('-')[0] + ':' + slot).then(blob => {
         if (blob) {
           try {
             const a = new Audio(URL.createObjectURL(blob));
+            if (onEnd) a.onended = onEnd;
             a.play();
             return;
           } catch (e) { /* fall through to TTS */ }
         }
-        api.speak(text, lang);
+        if (!text || !('speechSynthesis' in window)) { if (onEnd) onEnd(); return; }
+        try {
+          speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = lang;
+          u.rate = 0.85;
+          u.pitch = 1.05;
+          const v = pick(lang);
+          if (v) u.voice = v;
+          if (onEnd) u.onend = onEnd;
+          speechSynthesis.speak(u);
+        } catch (e) { if (onEnd) onEnd(); }
       });
     },
   };

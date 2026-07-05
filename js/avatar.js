@@ -60,7 +60,11 @@ function avatarSVG(cfg, cls) {
   const eyeY = style === 'hijab' ? 45 : 43;
   parts.push(`<circle cx="41" cy="${eyeY}" r="2.6" fill="#4E4439"/>`);
   parts.push(`<circle cx="59" cy="${eyeY}" r="2.6" fill="#4E4439"/>`);
-  parts.push(`<path d="M42 ${eyeY + 10} Q50 ${eyeY + 17} 58 ${eyeY + 10}" stroke="#4E4439" stroke-width="2.6" stroke-linecap="round" fill="none"/>`);
+  if (c.mouth === 'open') {
+    parts.push(`<ellipse cx="50" cy="${eyeY + 12}" rx="5.5" ry="7" fill="#7A4A3A"/>`);
+  } else {
+    parts.push(`<path d="M42 ${eyeY + 10} Q50 ${eyeY + 17} 58 ${eyeY + 10}" stroke="#4E4439" stroke-width="2.6" stroke-linecap="round" fill="none"/>`);
+  }
 
   // headwear on top
   if (c.head === 'crown') {
