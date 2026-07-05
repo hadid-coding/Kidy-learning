@@ -104,9 +104,15 @@ function runTapRounds(ctx, cfg) {
         grid.querySelectorAll('.choice').forEach(b => { if (b !== btn) b.classList.add('fade'); });
         ctx.sfx.drop();
         if (r.onCorrectFx) r.onCorrectFx();
-        // parent's recorded praise first, then the vocabulary word
-        if (r.onCorrectSpeak) ctx.praise(() => ctx.speak(r.onCorrectSpeak));
-        else ctx.praise();
+        // parent's recorded praise first, then the vocabulary word;
+        // praiseDelay lets a sound effect (siren…) finish before any voice,
+        // since mobile TTS takes audio focus and would mute it
+        const speakWin = () => {
+          if (r.onCorrectSpeak) ctx.praise(() => ctx.speak(r.onCorrectSpeak));
+          else ctx.praise();
+        };
+        if (r.praiseDelay) setTimeout(speakWin, r.praiseDelay);
+        else speakWin();
         round++;
         const wait = r.winDelay || (r.onCorrectSpeak ? 2100 : 1400);
         setTimeout(() => { round < rounds ? renderRound() : ctx.complete(); }, wait);
@@ -842,7 +848,7 @@ function gameVehicles(ctx) {
   const driveOff = (target) => () => {
     const road = ctx.area.querySelector('.road');
     if (road) road.innerHTML = `<span class="veh">${VEHICLE_EMOJI[target]}</span>`;
-    setTimeout(() => VEHICLE_SOUND[target](), 250);
+    VEHICLE_SOUND[target]();
   };
 
   if (ctx.level < 3) {
@@ -861,7 +867,8 @@ function gameVehicles(ctx) {
               correct: v === target,
             }))),
             onCorrectFx: driveOff(target),
-            winDelay: 3100,
+            praiseDelay: 2000,
+            winDelay: 3400,
           };
         }
         const target = pick1(IDS);
@@ -876,7 +883,8 @@ function gameVehicles(ctx) {
           })),
           onCorrectFx: driveOff(target),
           onCorrectSpeak: W[target][1],
-          winDelay: 3100,
+          praiseDelay: 2000,
+          winDelay: 3900,
         };
       },
     });
@@ -919,9 +927,9 @@ function gameVehicles(ctx) {
         const road = ctx.area.querySelector('.road');
         road.innerHTML = `<span class="veh">${VEHICLE_EMOJI[v]}</span>`;
         VEHICLE_SOUND[v]();
-        ctx.praise();
+        setTimeout(() => ctx.praise(), 2000); // after the siren, so TTS can't mute it
         m++;
-        setTimeout(() => { m < missions.length ? renderMission() : ctx.complete(); }, 3100);
+        setTimeout(() => { m < missions.length ? renderMission() : ctx.complete(); }, 3600);
       } else {
         ctx.sfx.knock();
         btn.classList.add('shake');
@@ -1109,10 +1117,15 @@ function gameJigsaw(ctx) {
   let board = 0;
   let usedPics = [];
 
-  function windowHTML(emoji, i, B, S) {
-    const c = i % n, r = Math.floor(i / n);
-    return `<span class="jig-win" style="width:${B}px;height:${B}px;
-      left:${-c * S}px;top:${-r * S}px;font-size:${B * 0.88}px">${emoji}</span>`;
+  // SVG viewBox cropping: the same 100×100 coordinate system everywhere, so
+  // ghost, slots and pieces always line up — on any screen, any emoji font
+  function cropSVG(emoji, i) {
+    const cell = 100 / n;
+    const vb = i === null ? '0 0 100 100'
+      : `${(i % n) * cell} ${Math.floor(i / n) * cell} ${cell} ${cell}`;
+    return `<svg class="jig-svg" viewBox="${vb}" aria-hidden="true">
+      <text x="50" y="50" font-size="88" text-anchor="middle" dominant-baseline="central">${emoji}</text>
+    </svg>`;
   }
 
   function renderBoard() {
@@ -1145,21 +1158,17 @@ function gameJigsaw(ctx) {
     ctx.area.querySelector('.speak-btn').addEventListener('click', () => ctx.speak(ctx.L.prompts.jigsaw));
     setTimeout(() => ctx.speak(ctx.L.prompts.jigsaw), 450);
 
-    // exact pixel math so ghost, slots and pieces all line up
     const boardEl = ctx.area.querySelector('.jig-board');
-    const B = boardEl.clientWidth;
-    const S = B / n;
-    const ghost = ctx.area.querySelector('.jig-ghost');
-    ghost.innerHTML = `<span class="jig-win" style="width:${B}px;height:${B}px;left:0;top:0;font-size:${B * 0.88}px">${emoji}</span>`;
+    const S = boardEl.clientWidth / n; // layout size only; crops are pure SVG
+    ctx.area.querySelector('.jig-ghost').innerHTML = cropSVG(emoji, null);
     fixed.forEach(i => {
       const slot = ctx.area.querySelector(`.jig-slot[data-i="${i}"]`);
       slot.classList.add('filled');
-      slot.innerHTML = windowHTML(emoji, i, B, S);
+      slot.innerHTML = cropSVG(emoji, i);
     });
     ctx.area.querySelectorAll('.jig-piece').forEach(piece => {
-      const i = +piece.dataset.i;
       piece.style.width = piece.style.height = S + 'px';
-      piece.innerHTML = windowHTML(emoji, i, B, S);
+      piece.innerHTML = cropSVG(emoji, +piece.dataset.i);
     });
 
     ctx.area.querySelectorAll('.jig-piece').forEach(piece => {

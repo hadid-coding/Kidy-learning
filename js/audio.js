@@ -99,44 +99,45 @@ const AudioFX = (() => {
     /* tiny soap bubble pops — washing game */
     bubble() { tone(900, 1500, 0, 0.07, 0.07); },
 
-    /* real-world vehicle sounds, kept quiet and short by design */
+    /* real-world vehicle sounds — louder than the ambient effects so they
+       carry on small phone/tablet speakers */
     siren(kind) {
       if (kind === 'wail') {
         for (let i = 0; i < 2; i++) {
-          tone(620, 1150, i * 1.0, 0.55, 0.07);
-          tone(1150, 620, i * 1.0 + 0.5, 0.55, 0.07);
+          tone(620, 1150, i * 1.0, 0.55, 0.18);
+          tone(1150, 620, i * 1.0 + 0.5, 0.55, 0.18);
         }
       } else if (kind === 'fast') {
         for (let i = 0; i < 4; i++) {
-          tone(850, 850, i * 0.36, 0.17, 0.07);
-          tone(640, 640, i * 0.36 + 0.18, 0.17, 0.07);
+          tone(850, 850, i * 0.36, 0.17, 0.18);
+          tone(640, 640, i * 0.36 + 0.18, 0.17, 0.18);
         }
       } else { // slow two-tone (fire truck)
         for (let i = 0; i < 2; i++) {
-          tone(470, 470, i * 0.9, 0.42, 0.08);
-          tone(590, 590, i * 0.9 + 0.45, 0.42, 0.08);
+          tone(470, 470, i * 0.9, 0.42, 0.2);
+          tone(590, 590, i * 0.9 + 0.45, 0.42, 0.2);
         }
       }
     },
     horn(low) {
       const f = low ? 180 : 330;
-      tone(f, f, 0, 0.45, 0.1, 'triangle');
-      tone(f * 1.5, f * 1.5, 0, 0.45, 0.06, 'triangle');
-      tone(f, f, 0.6, 0.3, 0.09, 'triangle');
-      tone(f * 1.5, f * 1.5, 0.6, 0.3, 0.05, 'triangle');
+      tone(f, f, 0, 0.45, 0.22, 'triangle');
+      tone(f * 1.5, f * 1.5, 0, 0.45, 0.12, 'triangle');
+      tone(f, f, 0.6, 0.3, 0.2, 'triangle');
+      tone(f * 1.5, f * 1.5, 0.6, 0.3, 0.11, 'triangle');
     },
     engine() {
-      noise(0, 1.8, 'lowpass', 140, 0.12);
-      for (let i = 0; i < 9; i++) tone(62, 55, i * 0.2, 0.14, 0.08, 'triangle');
+      noise(0, 1.8, 'lowpass', 140, 0.25);
+      for (let i = 0; i < 9; i++) tone(62, 55, i * 0.2, 0.14, 0.18, 'triangle');
     },
     whistle() {
-      tone(830, 830, 0, 0.5, 0.07);
-      tone(1040, 1040, 0, 0.5, 0.05);
-      tone(830, 830, 0.65, 0.7, 0.07);
-      tone(1040, 1040, 0.65, 0.7, 0.05);
+      tone(830, 830, 0, 0.5, 0.16);
+      tone(1040, 1040, 0, 0.5, 0.11);
+      tone(830, 830, 0.65, 0.7, 0.16);
+      tone(1040, 1040, 0.65, 0.7, 0.11);
     },
     clicks() {
-      for (let i = 0; i < 5; i++) tone(420 + i * 90, 380 + i * 90, i * 0.16, 0.07, 0.09, 'triangle');
+      for (let i = 0; i < 5; i++) tone(420 + i * 90, 380 + i * 90, i * 0.16, 0.07, 0.16, 'triangle');
     },
   };
 })();

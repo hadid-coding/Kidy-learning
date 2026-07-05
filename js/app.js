@@ -464,6 +464,10 @@
     });
   }
 
+  /* keep the audio context unlocked: iOS/Android suspend it aggressively,
+     so resume it inside every user gesture */
+  document.addEventListener('pointerdown', () => AudioFX.unlock(), { capture: true, passive: true });
+
   /* ---------- offline install (PWA) ---------- */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
