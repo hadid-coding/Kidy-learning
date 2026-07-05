@@ -14,7 +14,7 @@
   const state = {
     lang: null,
     settings: Object.assign(
-      { name: '', voice: true, sfx: true, breakMin: 20 },
+      { name: '', voice: true, sfx: true, breakMin: 20, avatar: Object.assign({}, AVATAR_DEFAULT) },
       store.get('kidy-settings-v1', {})
     ),
     // progress is kept per language so each language is a separate journey
@@ -48,6 +48,8 @@
   const L = () => I18N[state.lang];
   const speak = (text) => Voice.speak(text, L().tts);
   const praiseWord = () => pick1(L().praise);
+  // plays the parent's recording when one exists, else speech synthesis
+  const speakSlot = (slot, text) => Voice.speakSlot(slot, text, L().tts);
 
   /* ---------- screens ---------- */
 
@@ -80,7 +82,7 @@
     $app.innerHTML = `
       <div class="screen home-screen">
         <div class="top-bar">
-          <span class="top-title">🌱 Kidy</span>
+          <span class="top-title"><span class="home-avatar">${avatarSVG(state.settings.avatar)}</span> Kidy</span>
           <button class="btn-parents" id="btn-parents">⚙ ${L().ui.parents}</button>
         </div>
         <h2 class="screen-title">${L().ui.chooseGame}</h2>
@@ -158,6 +160,13 @@
       speak,
       sfx: AudioFX,
       praiseWord,
+      praise() { speakSlot('praise', praiseWord()); },
+      encourage() { speakSlot('tryAgain', L().ui.tryAgain); },
+      avatarCfg: state.settings.avatar,
+      saveAvatar(cfg) {
+        state.settings.avatar = Object.assign({}, state.settings.avatar, cfg);
+        saveSettings();
+      },
       complete() { earnStar(game.id, level); celebrate(game, level); },
     };
     game.start(ctx, level);
@@ -167,17 +176,17 @@
     AudioFX.birds();
     setTimeout(() => AudioFX.chime(), 700);
     const name = state.settings.name.trim();
-    const msg = `${L().ui.levelDone} ${praiseWord()}${name ? ' ' + name : ''} !`;
     const overlay = document.createElement('div');
     overlay.className = 'overlay celebrate';
     overlay.innerHTML = `
       <div class="celebrate-box">
         <div class="celebrate-star">★</div>
+        <div class="celebrate-avatar">${avatarSVG(state.settings.avatar)}</div>
         <div class="celebrate-text">${L().ui.levelDone}</div>
         <button class="btn-big" id="btn-next">${L().ui.next}</button>
       </div>`;
     $app.appendChild(overlay);
-    setTimeout(() => speak(`${praiseWord()}${name ? ', ' + name : ''}!`), 500);
+    setTimeout(() => speakSlot('bravo', `${praiseWord()}${name ? ', ' + name : ''}!`), 500);
     overlay.querySelector('#btn-next').addEventListener('click', () => {
       AudioFX.tap();
       overlay.remove();
@@ -251,6 +260,17 @@
             <option value="0" ${state.settings.breakMin === 0 ? 'selected' : ''}>${u.never}</option>
           </select>
         </label>
+        <div class="field">
+          <span>${u.avatarTitle}</span>
+          <button class="btn-avatar-edit" id="set-avatar">
+            ${avatarSVG(state.settings.avatar)}<span>${u.avatarBtn}</span>
+          </button>
+        </div>
+        <div class="rec-section">
+          <h3>🎙️ ${u.recTitle}</h3>
+          <p class="rec-hint">${u.recHint}</p>
+          <div id="rec-rows"></div>
+        </div>
         <div class="method">
           <h3>${u.methodTitle}</h3>
           <p>${u.methodText}</p>
@@ -264,6 +284,8 @@
     $app.appendChild(overlay);
 
     const q = (id) => overlay.querySelector(id);
+    q('#set-avatar').addEventListener('click', () => { overlay.remove(); screenAvatarEditor(); });
+    buildRecorder(q('#rec-rows'));
     q('#set-close').addEventListener('click', () => {
       state.settings.name = q('#set-name').value;
       state.settings.voice = q('#set-voice').checked;
@@ -281,6 +303,130 @@
       saveProgress();
       q('#set-reset').textContent = L().ui.resetDone;
       q('#set-reset').disabled = true;
+    });
+  }
+
+  /* ---------- avatar editor (parents corner) ---------- */
+
+  function screenAvatarEditor() {
+    const u = L().ui;
+    const cfg = Object.assign({}, AVATAR_DEFAULT, state.settings.avatar);
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay gate';
+    $app.appendChild(overlay);
+
+    function render() {
+      overlay.innerHTML = `
+        <div class="panel avatar-editor">
+          <h2>${u.avatarTitle}</h2>
+          <div class="mirror small">${avatarSVG(cfg)}</div>
+          <div class="field"><span>${u.skin}</span>
+            <div class="option-row" data-k="skin">
+              ${AVATAR_SKINS.map((c, i) => `<button class="opt dot-opt ${cfg.skin === i ? 'sel' : ''}"
+                data-v="${i}" style="background:${c}"></button>`).join('')}
+            </div>
+          </div>
+          <div class="field"><span>${u.hair}</span>
+            <div class="option-row" data-k="hair">
+              ${AVATAR_HAIR_STYLES.map((s, i) => `<button class="opt av-opt ${cfg.hair === i ? 'sel' : ''}" data-v="${i}">
+                ${avatarSVG(Object.assign({}, cfg, { hair: i, head: 'none' }))}</button>`).join('')}
+            </div>
+          </div>
+          <div class="field"><span>${u.colorLbl}</span>
+            <div class="option-row" data-k="hairColor">
+              ${AVATAR_HAIR_COLORS.map((c, i) => `<button class="opt dot-opt ${cfg.hairColor === i ? 'sel' : ''}"
+                data-v="${i}" style="background:${c}"></button>`).join('')}
+            </div>
+          </div>
+          <button class="btn-big" id="av-save">${u.close}</button>
+        </div>`;
+      overlay.querySelectorAll('.option-row').forEach(row =>
+        row.addEventListener('click', (e) => {
+          const b = e.target.closest('.opt');
+          if (!b) return;
+          cfg[row.dataset.k] = +b.dataset.v;
+          AudioFX.tap();
+          render();
+        }));
+      overlay.querySelector('#av-save').addEventListener('click', () => {
+        state.settings.avatar = cfg;
+        saveSettings();
+        overlay.remove();
+        screenHome();
+      });
+    }
+    render();
+  }
+
+  /* ---------- parent voice recorder ---------- */
+
+  function buildRecorder(container) {
+    const u = L().ui;
+    const slots = ['praise', 'tryAgain', 'bravo', 'break'];
+    const key = (slot) => state.lang + ':' + slot;
+    let active = null; // { recorder, stream, timer }
+
+    function stopActive() {
+      if (!active) return;
+      clearTimeout(active.timer);
+      try { active.recorder.stop(); } catch (e) {}
+      active = null;
+    }
+
+    function row(slot, has) {
+      return `
+        <div class="rec-row" data-slot="${slot}">
+          <span class="rec-label">${u.recSlots[slot]}</span>
+          <span class="rec-btns">
+            <button class="rec-btn rec-do" title="rec">🎙️</button>
+            <button class="rec-btn rec-play" ${has ? '' : 'hidden'}>▶️</button>
+            <button class="rec-btn rec-del" ${has ? '' : 'hidden'}>🗑️</button>
+          </span>
+        </div>`;
+    }
+
+    Promise.all(slots.map(s => Rec.load(key(s)))).then(blobs => {
+      container.innerHTML = slots.map((s, i) => row(s, !!blobs[i])).join('');
+      container.addEventListener('click', (e) => {
+        const rowEl = e.target.closest('.rec-row');
+        if (!rowEl) return;
+        const slot = rowEl.dataset.slot;
+        const doBtn = rowEl.querySelector('.rec-do');
+
+        if (e.target.closest('.rec-play')) {
+          Rec.load(key(slot)).then(b => { if (b) new Audio(URL.createObjectURL(b)).play(); });
+          return;
+        }
+        if (e.target.closest('.rec-del')) {
+          Rec.del(key(slot)).then(() => {
+            rowEl.querySelector('.rec-play').hidden = true;
+            rowEl.querySelector('.rec-del').hidden = true;
+          });
+          return;
+        }
+        if (e.target.closest('.rec-do')) {
+          if (active) { stopActive(); return; }
+          navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            const recorder = new MediaRecorder(stream);
+            const chunks = [];
+            recorder.ondataavailable = (ev) => chunks.push(ev.data);
+            recorder.onstop = () => {
+              stream.getTracks().forEach(t => t.stop());
+              doBtn.textContent = '🎙️';
+              doBtn.classList.remove('recording');
+              const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+              Rec.save(key(slot), blob).then(() => {
+                rowEl.querySelector('.rec-play').hidden = false;
+                rowEl.querySelector('.rec-del').hidden = false;
+              });
+            };
+            recorder.start();
+            doBtn.textContent = '⏹️';
+            doBtn.classList.add('recording');
+            active = { recorder, stream, timer: setTimeout(stopActive, 6000) };
+          }).catch(() => { doBtn.textContent = '🚫'; doBtn.title = u.micError; });
+        }
+      });
     });
   }
 
@@ -310,11 +456,18 @@
       </div>`;
     $app.appendChild(overlay);
     AudioFX.birds();
-    speak(`${u.breakTitle} ${u.breakMsg}`);
+    speakSlot('break', `${u.breakTitle} ${u.breakMsg}`);
     holdButton(overlay.querySelector('#break-hold'), () => {
       overlay.remove();
       state.activeSeconds = 0;
       state.breakShown = false;
+    });
+  }
+
+  /* ---------- offline install (PWA) ---------- */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
     });
   }
 

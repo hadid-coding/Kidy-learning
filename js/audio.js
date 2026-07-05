@@ -33,6 +33,27 @@ const AudioFX = (() => {
     osc.stop(t0 + dur + 0.05);
   }
 
+  function noise(start, dur, filterType, freq, peak) {
+    const c = ac();
+    if (!c || !enabled) return;
+    const t0 = c.currentTime + start;
+    const len = Math.ceil(c.sampleRate * dur);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const f = c.createBiquadFilter();
+    f.type = filterType;
+    f.frequency.value = freq;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f).connect(g).connect(c.destination);
+    src.start(t0);
+  }
+
   return {
     setEnabled(v) { enabled = v; },
     unlock() { ac(); },
@@ -62,6 +83,78 @@ const AudioFX = (() => {
       tone(880, 880, 0, 1.1, 0.12);
       tone(1320, 1320, 0.05, 0.9, 0.06);
     },
+
+    /* gentle frying sizzle — cooking game */
+    sizzle() {
+      noise(0, 2.2, 'highpass', 2500, 0.06);
+      noise(0.3, 1.6, 'bandpass', 5000, 0.04);
+    },
+
+    /* real-world vehicle sounds, kept quiet and short by design */
+    siren(kind) {
+      if (kind === 'wail') {
+        for (let i = 0; i < 2; i++) {
+          tone(620, 1150, i * 1.0, 0.55, 0.07);
+          tone(1150, 620, i * 1.0 + 0.5, 0.55, 0.07);
+        }
+      } else if (kind === 'fast') {
+        for (let i = 0; i < 4; i++) {
+          tone(850, 850, i * 0.36, 0.17, 0.07);
+          tone(640, 640, i * 0.36 + 0.18, 0.17, 0.07);
+        }
+      } else { // slow two-tone (fire truck)
+        for (let i = 0; i < 2; i++) {
+          tone(470, 470, i * 0.9, 0.42, 0.08);
+          tone(590, 590, i * 0.9 + 0.45, 0.42, 0.08);
+        }
+      }
+    },
+    horn(low) {
+      const f = low ? 180 : 330;
+      tone(f, f, 0, 0.45, 0.1, 'triangle');
+      tone(f * 1.5, f * 1.5, 0, 0.45, 0.06, 'triangle');
+      tone(f, f, 0.6, 0.3, 0.09, 'triangle');
+      tone(f * 1.5, f * 1.5, 0.6, 0.3, 0.05, 'triangle');
+    },
+    engine() {
+      noise(0, 1.8, 'lowpass', 140, 0.12);
+      for (let i = 0; i < 9; i++) tone(62, 55, i * 0.2, 0.14, 0.08, 'triangle');
+    },
+    whistle() {
+      tone(830, 830, 0, 0.5, 0.07);
+      tone(1040, 1040, 0, 0.5, 0.05);
+      tone(830, 830, 0.65, 0.7, 0.07);
+      tone(1040, 1040, 0.65, 0.7, 0.05);
+    },
+    clicks() {
+      for (let i = 0; i < 5; i++) tone(420 + i * 90, 380 + i * 90, i * 0.16, 0.07, 0.09, 'triangle');
+    },
+  };
+})();
+
+/* Parent voice recordings, stored locally in IndexedDB (never uploaded).
+   Keys are "<lang>:<slot>" so each language keeps its own recordings. */
+const Rec = (() => {
+  function db() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('kidy-voice', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('clips');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  function tx(mode, fn) {
+    return db().then(d => new Promise((res, rej) => {
+      const t = d.transaction('clips', mode);
+      const req = fn(t.objectStore('clips'));
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    })).catch(() => undefined);
+  }
+  return {
+    save: (key, blob) => tx('readwrite', s => s.put(blob, key)),
+    load: (key) => tx('readonly', s => s.get(key)),
+    del: (key) => tx('readwrite', s => s.delete(key)),
   };
 })();
 
@@ -87,7 +180,7 @@ const Voice = (() => {
         || null;
   }
 
-  return {
+  const api = {
     setEnabled(v) { enabled = v; if (!v) try { speechSynthesis.cancel(); } catch (e) {} },
     speak(text, lang) {
       if (!enabled || !text || !('speechSynthesis' in window)) return;
@@ -102,5 +195,21 @@ const Voice = (() => {
         speechSynthesis.speak(u);
       } catch (e) { /* no voice available — visual prompts still work */ }
     },
+    /* Plays the parent's own recording for this slot when one exists,
+       otherwise falls back to speech synthesis. */
+    speakSlot(slot, text, lang) {
+      if (!enabled) return;
+      Rec.load(lang.split('-')[0] + ':' + slot).then(blob => {
+        if (blob) {
+          try {
+            const a = new Audio(URL.createObjectURL(blob));
+            a.play();
+            return;
+          } catch (e) { /* fall through to TTS */ }
+        }
+        api.speak(text, lang);
+      });
+    },
   };
+  return api;
 })();
